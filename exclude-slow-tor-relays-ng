@@ -35,8 +35,8 @@ except Exception:
 
 #: The minimum bandwidth a relay should have, in kilobytes. Relays with less
 #: than this amount of bandwidth will be added to the ExcludeNodes line and
-#: therefore not used by your Tor client. (default: 600 KB/s)
-MINIMUM_BANDWIDTH = 600
+#: therefore not used by your Tor client. (default: 3000 KB/s)
+MINIMUM_BANDWIDTH = 3000
 
 #: The path to the directory which your Tor process stores data in. In your
 #: torrc file, this directory is given under the option `DataDirectory`. Please
