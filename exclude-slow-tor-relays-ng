@@ -44,7 +44,6 @@ MINIMUM_BANDWIDTH = 600
 TOR_DATA_DIR = "/var/lib/tor"
 
 #: The path to Tor's init.d script (default: "/etc/init.d/tor-git")
-TOR_INITD_SCRIPT = "/etc/init.d/tor"
 
 #: The names of various flavours of consensus files which we might find in the
 #: :data:`TOR_DATA_DIR`. These files should hold basic information on all the
@@ -69,7 +68,7 @@ def _get_args():
                               "excluded (default: %s KB/s)" % MINIMUM_BANDWIDTH))
     parser.add_argument('-f', '--file',
                         help=("The path to the file to write the new ExcludeNodes "
-                              "torrc to (default: DATA_DIR/../torrc.exclude-nodes)"))
+                              "torrc to (default: DATA_DIR/torrc.exclude-nodes)"), default=TOR_DATA_DIR + "/torrc.exclude-nodes")
     parser.add_argument('-i', '--in-place',
                         help=("Edit the primary torrc file in place. Provide the"
                               " path to the torrc file to edit in place"))
@@ -79,7 +78,7 @@ def _get_args():
     log_group.add_argument('--stdout', action='store_true', help="Log to stdout")
     log_group.add_argument('--logfile', help="Log to file")
     log_group.add_argument('--loglevel', help="Log level", default="INFO",
-                           choices=["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"])
+                           choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
 
     args = parser.parse_args()
     return args
@@ -113,27 +112,6 @@ def find_slow_nodes(consensus, minimum_bandwidth):
 
     return too_slow
 
-def add_new_torrc_to_initd(initd_script, torrc):
-    """TODO Add the torrc filepath returned from write_torrc() to the ARGS=
-    variable in TOR_INITD_SCRIPT if it is not already there.
-    """
-    log.info("\n" + "-" * 80)
-
-    line = '\tARGS="${ARGS} -f %s"' % torrc
-    usage = "You should add `-f %s` to your usual invocation of Tor. " % torrc
-    initd = os.path.isfile(TOR_INITD_SCRIPT)
-
-    if initd:
-        usage = usage + "For example, you might wish to add the line:\n"
-
-    for index in range(0, len(usage), 80):
-        log.info(usage[index:index+80])
-    if initd:
-        log.info(line)
-        log.info("\nto your Tor init.d script (%s)." % TOR_INITD_SCRIPT)
-
-    log.info("-" * 80)
-
 def write_torrc(data_dir, lines):
     filename = 'torrc.exclude-slow'
     filepath = os.path.join(os.path.dirname(data_dir), filename)
@@ -162,8 +140,10 @@ def write_torrc_in_place(torrc_path, exclude):
                 excluded_nodes = line.strip().replace("ExcludeNodes ", "").split(',')
                 excluded_nodes.extend(exclude)
                 excluded_nodes = list(set(excluded_nodes))
-
+                excluded_nodes.sort(reverse=True)
+                log.debug("\nNew torrc Excluded Nodes: " + str(excluded_nodes))
                 line = create_exclude_nodes_line(excluded_nodes)
+
 
             torrc_lines.append(line)
 
@@ -197,7 +177,18 @@ def main(args):
     else:
         log.addHandler(logging.StreamHandler(sys.stdout))
 
-    log.setLevel(logging._levelNames[args.loglevel])
+
+    if args.loglevel == "INFO":
+        log.setLevel(logging.INFO)
+    elif args.loglevel == "DEBUG":
+        log.setLevel(logging.DEBUG)
+    elif args.loglevel == "WARNING":
+        log.setLevel(logging.WARNING)
+    elif args.loglevel == "ERROR":
+        log.setLevel(logging.ERROR)
+    elif args.loglevel == "CRITICAL":
+        log.setLevel(logging.CRITICAL)
+
 
     if args.consensus_file:
         consensii.append(args.consensus_file)
@@ -218,7 +209,7 @@ def main(args):
                     log.info("Your user (%s) can't read the consensus file %s."
                              % (cur_uid, filepath))
     else:
-        log.warn("Your user (%s) can't read Tor's DataDirectory (%s)."
+        log.warning("Your user (%s) can't read Tor's DataDirectory (%s)."
                  % (cur_uid, data_dir))
 
     if not consensus:
@@ -233,7 +224,6 @@ def main(args):
             write_torrc_in_place(args.in_place, too_slow)
         if args.file:
             torrc = write_torrc(data_dir, exclude_nodes)
-            add_new_torrc_to_initd(TOR_INITD_SCRIPT, torrc)
 
     return exclude_nodes
 
